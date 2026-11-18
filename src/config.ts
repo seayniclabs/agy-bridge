@@ -9,6 +9,13 @@ export interface Config {
    * Takes precedence over the global AGY_TIMEOUT and the tool's default.
    */
   perToolTimeouts: Record<string, number>;
+  /**
+   * Per-tool model chain overrides from AGY_CHAIN_<TOOL_NAME> env vars,
+   * a `|`-separated list of model names or `*` version patterns
+   * (e.g. AGY_CHAIN_ADVERSARIAL_REVIEW="Gemini * Argon (High)|Gemini * Flash (High)").
+   * Lets operators follow model renames without a release.
+   */
+  perToolChains: Record<string, string[]>;
   maxOutputChars: number;
   defaultModel: string | undefined;
   skipPermissions: boolean;
@@ -33,12 +40,27 @@ function loadPerToolTimeouts(env: Record<string, string | undefined>): Record<st
   return out;
 }
 
+function loadPerToolChains(env: Record<string, string | undefined>): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const [key, raw] of Object.entries(env)) {
+    if (!key.startsWith("AGY_CHAIN_") || !raw) continue;
+    const tool = key.slice("AGY_CHAIN_".length).toLowerCase();
+    const chain = raw
+      .split("|")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    if (tool && chain.length > 0) out[tool] = chain;
+  }
+  return out;
+}
+
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
   return {
     agyPath: env.AGY_PATH || "agy",
     timeoutSec: positiveInt(env.AGY_TIMEOUT, 1200),
     timeoutExplicit: positiveInt(env.AGY_TIMEOUT, 0) > 0,
     perToolTimeouts: loadPerToolTimeouts(env),
+    perToolChains: loadPerToolChains(env),
     maxOutputChars: positiveInt(env.AGY_MAX_OUTPUT_CHARS, 50_000),
     defaultModel: env.AGY_DEFAULT_MODEL || undefined,
     skipPermissions: env.AGY_SKIP_PERMISSIONS !== "false",

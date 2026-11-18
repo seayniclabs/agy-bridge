@@ -41,7 +41,7 @@ export function createToolHandler(
         ? { models: [undefined], note: undefined }
         : await registry.resolveChain({
             explicit: args.model as string | undefined,
-            chain: tool.chain,
+            chain: cfg.perToolChains[tool.name] ?? tool.chain,
             defaultModel: cfg.defaultModel,
           });
 

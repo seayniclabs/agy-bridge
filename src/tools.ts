@@ -36,7 +36,14 @@ export interface ToolDef {
 }
 
 // Gemini first, always; other families only when no Gemini model is listed at all.
-const NON_GEMINI_FALLBACK = ["Claude Opus * (Thinking)", "GPT-OSS 120B (Medium)"];
+// Model names change between agy releases (Gemini "Pro" became "Gemini 4 Argon";
+// Claude "(Thinking)" variants became "(Low|Medium|High)"). Current names go first,
+// older names stay as fallbacks so an older agy still resolves.
+const NON_GEMINI_FALLBACK = [
+  "Claude Opus * (High)",
+  "Claude Opus * (Thinking)",
+  "GPT-OSS 120B (Medium)",
+];
 
 export const TOOLS: ToolDef[] = [
   {
@@ -54,7 +61,12 @@ export const TOOLS: ToolDef[] = [
       question: z.string().describe("What you want to know about these files."),
       ...commonShape,
     },
-    chain: ["Gemini * Flash (High)", "Gemini * Pro (Low)", ...NON_GEMINI_FALLBACK],
+    chain: [
+      "Gemini * Flash (High)",
+      "Gemini * Argon (Low)",
+      "Gemini * Pro (Low)",
+      ...NON_GEMINI_FALLBACK,
+    ],
     timeoutSec: 300,
     buildPrompt(args, cwd) {
       const files = resolveFiles(args.files as string[], cwd);
@@ -120,7 +132,13 @@ export const TOOLS: ToolDef[] = [
       focus: z.string().optional().describe("Optional focus area, e.g. 'security', 'concurrency'."),
       ...commonShape,
     },
-    chain: ["Gemini * Pro (High)", "Gemini * Flash (High)", ...NON_GEMINI_FALLBACK],
+    chain: [
+      "Gemini * Argon (High)",
+      "Gemini * Hydrogen (High)",
+      "Gemini * Pro (High)",
+      "Gemini * Flash (High)",
+      ...NON_GEMINI_FALLBACK,
+    ],
     timeoutSec: 300,
     buildPrompt(args, cwd) {
       const files = args.files as string[] | undefined;

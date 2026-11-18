@@ -15,6 +15,7 @@ const cfg: Config = {
   timeoutSec: 600,
   timeoutExplicit: false,
   perToolTimeouts: {},
+  perToolChains: {},
   maxOutputChars: 100,
   defaultModel: undefined,
   skipPermissions: true,

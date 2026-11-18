@@ -9,6 +9,7 @@ describe("loadConfig", () => {
       timeoutSec: 1200,
       timeoutExplicit: false,
       perToolTimeouts: {},
+      perToolChains: {},
       maxOutputChars: 50_000,
       defaultModel: undefined,
       skipPermissions: true,
@@ -58,5 +59,15 @@ describe("loadConfig", () => {
 
   it("treats unknown AGY_ON_FAILURE values as fallback", () => {
     expect(loadConfig({ AGY_ON_FAILURE: "explode" }).onFailure).toBe("fallback");
+  });
+
+  it("reads per-tool model chains from AGY_CHAIN_<TOOL>", () => {
+    const c = loadConfig({
+      AGY_CHAIN_ADVERSARIAL_REVIEW: " Gemini * Argon (High) | GPT-OSS 120B (Medium) ",
+      AGY_CHAIN_EMPTY: " | ",
+    });
+    expect(c.perToolChains).toEqual({
+      adversarial_review: ["Gemini * Argon (High)", "GPT-OSS 120B (Medium)"],
+    });
   });
 });

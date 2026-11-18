@@ -146,6 +146,15 @@ export class ModelRegistry {
         note: "no preferred model available; using agy's own default model",
       };
     }
+    // Surface drift: when the first-choice pattern matches nothing, say so in the
+    // result so callers see that a rename left the tool on a lesser model.
+    const first = opts.chain[0];
+    if (first && !pickModel(first, available)) {
+      return {
+        models,
+        note: `preferred model "${first}" is not in \`agy models\`; using ${models[0]}`,
+      };
+    }
     return { models };
   }
 }

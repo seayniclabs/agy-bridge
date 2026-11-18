@@ -11,6 +11,7 @@ const cfg: Config = {
   timeoutSec: 600,
   timeoutExplicit: false,
   perToolTimeouts: {},
+  perToolChains: {},
   maxOutputChars: 50_000,
   defaultModel: undefined,
   skipPermissions: true,
@@ -197,5 +198,72 @@ describe("createToolHandler", () => {
     const res = await handlerFor("delegate", f)({ prompt: "x" }, { signal: ac.signal });
     expect(res.isError).toBe(true);
     expect((res.content[0] as { text: string }).text).toMatch(/cancelled/i);
+  });
+
+  // `agy models` as listed on 2026-11-17: Gemini "Pro" is now "Gemini 4 Argon",
+  // and Claude models carry effort levels instead of "(Thinking)".
+  const LISTING_2026_11 = [
+    "gemini-4-argon-medium\tGemini 4 Argon (Medium)",
+    "gemini-4-argon-high\tGemini 4 Argon (High)",
+    "gemini-4-argon-low\tGemini 4 Argon (Low)",
+    "gemini-4-hydrogen-high\tGemini 4 Hydrogen (High)",
+    "gemini-3.8-flash-high\tGemini 3.8 Flash (High)",
+    "gemini-3.8-flash-medium\tGemini 3.8 Flash (Medium)",
+    "claude-opus-5-5-high\tClaude Opus 5.5 (High)",
+    "gpt-oss-120b-medium\tGPT-OSS 120B (Medium)",
+  ].join("\n");
+
+  const handlerWithListing = (
+    name: string,
+    f: ReturnType<typeof fakeDeps>,
+    listing: string,
+    overrides: Partial<Config> = {},
+  ) =>
+    createToolHandler(
+      TOOLS.find((t) => t.name === name)!,
+      { ...cfg, ...overrides },
+      new ModelRegistry(async () => listing),
+      f.deps,
+      new CooldownRegistry(),
+    );
+
+  it("adversarial_review picks Gemini 4 Argon (High) from the current model list", async () => {
+    const f = fakeDeps();
+    const res = await handlerWithListing(
+      "adversarial_review",
+      f,
+      LISTING_2026_11,
+    )({ content: "plan" });
+    const text = (res.content[0] as { text: string }).text;
+    expect(f.modelOf(f.runs[0])).toBe("Gemini 4 Argon (High)");
+    expect(text).not.toContain("preferred model");
+  });
+
+  it("every tool's chain resolves to at least one model in the current list", async () => {
+    const registry = new ModelRegistry(async () => LISTING_2026_11);
+    for (const tool of TOOLS.filter((t) => t.chain.length > 0)) {
+      const r = await registry.resolveChain({ chain: tool.chain });
+      expect(r.models[0], tool.name).toBeDefined();
+    }
+  });
+
+  it("AGY_CHAIN_<TOOL> overrides the built-in chain", async () => {
+    const f = fakeDeps();
+    await handlerWithListing("adversarial_review", f, LISTING_2026_11, {
+      perToolChains: { adversarial_review: ["GPT-OSS 120B (Medium)"] },
+    })({ content: "plan" });
+    expect(f.modelOf(f.runs[0])).toBe("GPT-OSS 120B (Medium)");
+  });
+
+  it("says so in the result when the first-choice model is missing", async () => {
+    const f = fakeDeps();
+    const res = await handlerWithListing(
+      "adversarial_review",
+      f,
+      "Gemini 3.8 Flash (High)\n",
+    )({ content: "plan" });
+    const text = (res.content[0] as { text: string }).text;
+    expect(f.modelOf(f.runs[0])).toBe("Gemini 3.8 Flash (High)");
+    expect(text).toContain('preferred model "Gemini * Argon (High)" is not in `agy models`');
   });
 });
